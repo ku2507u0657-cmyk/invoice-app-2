@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% set is_edit = (mode == 'edit') %}
+{% block title %}{{ 'Edit' if is_edit else 'Add' }} Client — {{ app_name }}{% endblock %}
+{% block page_title %}{{ 'Edit' if is_edit else 'Add' }} Client{% endblock %}
+
+{% block content %}
+
+<!-- ── Breadcrumb ──────────────────────────────────────────── -->
+<nav class="breadcrumb-nav">
+  <a href="{{ url_for('clients.list_clients') }}">Clients</a>
+  <i class="bi bi-chevron-right"></i>
+  <span>{{ 'Edit' if is_edit else 'New Client' }}</span>
+</nav>
+
+<!-- ── Form card ───────────────────────────────────────────── -->
+<div class="form-card">
+
+  <div class="form-card-header">
+    <div class="form-card-icon {{ 'amber' if is_edit else 'teal' }}">
+      <i class="bi bi-{{ 'pencil' if is_edit else 'person-plus-fill' }}"></i>
+    </div>
+    <div>
+      <h2 class="form-card-title">
+        {{ 'Edit Client' if is_edit else 'New Client' }}
+      </h2>
+      <p class="form-card-sub">
+        {% if is_edit %}
+          Update the details for <strong>{{ client.name }}</strong>.
+        {% else %}
+          Fill in the details to add a new billing client.
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  <form
+    method="POST"
+    action="{{ url_for('clients.edit_client', client_id=client.id) if is_edit else url_for('clients.add_client') }}"
+    novalidate
+    class="client-form"
+  >
+
+    <!-- ── Row 1: Name (full width) ──────────────────────── -->
+    <div class="form-row">
+      <div class="form-group full-width">
+        <label class="form-label required" for="name">
+          Client Name
+        </label>
+        <div class="input-wrap">
+          <i class="bi bi-building input-icon"></i>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            class="form-field"
+            placeholder="e.g. Acme Corporation"
+            value="{{ client.name or '' }}"
+            required
+            autofocus
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Row 2: Email + Phone ───────────────────────────── -->
+    <div class="form-row two-col">
+      <div class="form-group">
+        <label class="form-label" for="email">Email Address</label>
+        <div class="input-wrap">
+          <i class="bi bi-envelope input-icon"></i>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            class="form-field"
+            placeholder="billing@example.com"
+            value="{{ client.email or '' }}"
+          />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="phone">Phone Number</label>
+        <div class="input-wrap">
+          <i class="bi bi-telephone input-icon"></i>
+          <input
+            type="tel"
+            id="phone"
+            name="phone"
+            class="form-field"
+            placeholder="+91 98765 43210"
+            value="{{ client.phone or '' }}"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Row 3: Monthly Fee + GST Number ───────────────── -->
+    <div class="form-row two-col">
+      <div class="form-group">
+        <label class="form-label" for="monthly_fee">Monthly Fee</label>
+        <div class="input-wrap">
+          <span class="input-prefix">$</span>
+          <input
+            type="number"
+            id="monthly_fee"
+            name="monthly_fee"
+            class="form-field has-prefix"
+            placeholder="0.00"
+            step="0.01"
+            min="0"
+            value="{{ '%.2f'|format(client.monthly_fee|float) if client.monthly_fee else '' }}"
+          />
+        </div>
+        <span class="form-hint">Leave blank if not applicable.</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="gst_number">GST Number</label>
+        <div class="input-wrap">
+          <i class="bi bi-file-earmark-text input-icon"></i>
+          <input
+            type="text"
+            id="gst_number"
+            name="gst_number"
+            class="form-field"
+            placeholder="e.g. 29ABCDE1234F1Z5"
+            value="{{ client.gst_number or '' }}"
+            maxlength="30"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Actions ───────────────────────────────────────── -->
+    <div class="form-actions">
+      <a href="{{ url_for('clients.list_clients') }}" class="btn-cancel">
+        <i class="bi bi-x-lg"></i> Cancel
+      </a>
+      <button type="submit" class="btn-submit">
+        <i class="bi bi-{{ 'check-lg' if is_edit else 'plus-lg' }}"></i>
+        {{ 'Save Changes' if is_edit else 'Add Client' }}
+      </button>
+    </div>
+
+  </form>
+</div>
+
+<!-- ── Danger zone (edit only) ────────────────────────────── -->
+{% if is_edit %}
+<div class="danger-zone">
+  <div class="danger-zone-header">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    Danger Zone
+  </div>
+  <div class="danger-zone-body">
+    <div>
+      <strong>Delete this client</strong>
+      <p>Permanently remove {{ client.name }} and all associated records. This cannot be undone.</p>
+    </div>
+    <button
+      type="button"
+      class="btn-danger"
+      onclick="confirmDelete('{{ client.name }}', '{{ url_for('clients.delete_client', client_id=client.id) }}')">
+      <i class="bi bi-trash3"></i> Delete Client
+    </button>
+  </div>
+</div>
+
+<!-- Delete confirmation modal -->
+<div id="deleteModal" class="modal-backdrop" style="display:none">
+  <div class="modal-box">
+    <div class="modal-icon danger"><i class="bi bi-exclamation-triangle-fill"></i></div>
+    <h3 class="modal-title">Delete Client?</h3>
+    <p class="modal-body">
+      You're about to permanently delete
+      <strong id="deleteClientName"></strong>.
+      This cannot be undone.
+    </p>
+    <div class="modal-actions">
+      <button onclick="closeModal()" class="modal-btn cancel">Cancel</button>
+      <form id="deleteForm" method="POST">
+        <button type="submit" class="modal-btn confirm-delete">Delete</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{% if is_edit %}
+<script>
+  function confirmDelete(name, url) {
+    document.getElementById('deleteClientName').textContent = name;
+    document.getElementById('deleteForm').action = url;
+    document.getElementById('deleteModal').style.display = 'flex';
+  }
+  function closeModal() {
+    document.getElementById('deleteModal').style.display = 'none';
+  }
+  document.getElementById('deleteModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeModal();
+  });
+</script>
+{% endif %}
+{% endblock %}

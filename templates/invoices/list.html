@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Invoices — {{ app_name }}{% endblock %}
+{% block page_title %}Invoices{% endblock %}
+
+{% block content %}
+
+<!-- ── Page header ─────────────────────────────────────────── -->
+<div class="page-header">
+  <div class="page-header-left">
+    <h1 class="page-heading">Invoices</h1>
+    <p class="page-sub">{{ pagination.total }} invoice{{ 's' if pagination.total != 1 else '' }}</p>
+  </div>
+  <a href="{{ url_for('invoices.create_invoice') }}" class="btn-action-primary">
+    <i class="bi bi-plus-lg"></i> New Invoice
+  </a>
+</div>
+
+<!-- ── Filter tabs ─────────────────────────────────────────── -->
+<div class="filter-tabs">
+  <a href="{{ url_for('invoices.list_invoices', q=search) }}"
+     class="filter-tab {{ 'active' if not status_filter else '' }}">
+    All
+    <span class="filter-count">{{ counts.all }}</span>
+  </a>
+  <a href="{{ url_for('invoices.list_invoices', status='unpaid', q=search) }}"
+     class="filter-tab {{ 'active' if status_filter == 'unpaid' else '' }}">
+    Unpaid
+    <span class="filter-count amber">{{ counts.unpaid }}</span>
+  </a>
+  <a href="{{ url_for('invoices.list_invoices', status='paid', q=search) }}"
+     class="filter-tab {{ 'active' if status_filter == 'paid' else '' }}">
+    Paid
+    <span class="filter-count green">{{ counts.paid }}</span>
+  </a>
+  <a href="{{ url_for('invoices.list_invoices', status='overdue', q=search) }}"
+     class="filter-tab {{ 'active' if status_filter == 'overdue' else '' }}">
+    Overdue
+    <span class="filter-count red">{{ counts.overdue }}</span>
+  </a>
+</div>
+
+<!-- ── Search ──────────────────────────────────────────────── -->
+<form method="GET" action="{{ url_for('invoices.list_invoices') }}" class="search-bar-form">
+  {% if status_filter %}
+    <input type="hidden" name="status" value="{{ status_filter }}" />
+  {% endif %}
+  <div class="search-bar-wrap">
+    <i class="bi bi-search search-icon"></i>
+    <input type="search" name="q" class="search-input"
+           placeholder="Search by invoice number or client name…"
+           value="{{ search }}" autocomplete="off" />
+    {% if search %}
+      <a href="{{ url_for('invoices.list_invoices', status=status_filter) }}"
+         class="search-clear" title="Clear"><i class="bi bi-x-lg"></i></a>
+    {% endif %}
+  </div>
+  <button type="submit" class="btn-search">Search</button>
+</form>
+
+<!-- ── Invoice table ───────────────────────────────────────── -->
+{% if invoices %}
+<div class="table-card">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Invoice #</th>
+        <th>Client</th>
+        <th class="text-right">Amount</th>
+        <th class="text-right">GST (18%)</th>
+        <th class="text-right">Total</th>
+        <th>Due Date</th>
+        <th>Status</th>
+        <th>Created</th>
+        <th class="text-center">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for inv in invoices %}
+      <tr class="table-row">
+
+        <!-- Invoice number -->
+        <td>
+          <span class="inv-number">{{ inv.invoice_number }}</span>
+        </td>
+
+        <!-- Client -->
+        <td>
+          <div class="client-name-cell">
+            <div class="client-avatar">{{ inv.client.initials }}</div>
+            <span class="client-name">{{ inv.client.name }}</span>
+          </div>
+        </td>
+
+        <!-- Amount -->
+        <td class="text-right mono-num">{{ inv.amount_display }}</td>
+
+        <!-- GST -->
+        <td class="text-right mono-num muted">{{ inv.gst_display }}</td>
+
+        <!-- Total -->
+        <td class="text-right">
+          <strong class="mono-num">{{ inv.total_display }}</strong>
+        </td>
+
+        <!-- Due date -->
+        <td class="table-date">
+          {% if inv.effective_status == 'overdue' %}
+            <span class="overdue-date">
+              <i class="bi bi-exclamation-circle-fill"></i>
+              {{ inv.due_date.strftime('%d %b %Y') }}
+            </span>
+          {% else %}
+            {{ inv.due_date.strftime('%d %b %Y') }}
+          {% endif %}
+        </td>
+
+        <!-- Status pill -->
+        <td>
+          {% set label, css = inv.status_label %}
+          <span class="status-pill {{ css }}">{{ label }}</span>
+        </td>
+
+        <!-- Created date -->
+        <td class="table-date">{{ inv.created_at.strftime('%d %b %Y') }}</td>
+
+        <!-- Mark-paid action -->
+        <td class="text-center">
+          {% if inv.status != 'paid' %}
+          <form method="POST"
+                action="{{ url_for('invoices.mark_paid', invoice_id=inv.id) }}"
+                style="display:inline"
+                onsubmit="return confirm('Mark {{ inv.invoice_number }} as paid?')">
+            <button type="submit" class="btn-mark-paid" title="Mark as paid">
+              <i class="bi bi-check-lg"></i> Mark Paid
+            </button>
+          </form>
+          {% else %}
+          <span class="paid-stamp">
+            <i class="bi bi-check-all"></i> Paid
+            {% if inv.paid_at %}
+              <small>{{ inv.paid_at.strftime('%d %b') }}</small>
+            {% endif %}
+          </span>
+          {% endif %}
+        </td>
+
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ── Pagination ──────────────────────────────────────────── -->
+{% if pagination.pages > 1 %}
+<div class="pagination-row">
+  <span class="pagination-info">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+  <div class="pagination-btns">
+    {% if pagination.has_prev %}
+      <a href="{{ url_for('invoices.list_invoices', page=pagination.prev_num, status=status_filter, q=search) }}"
+         class="pg-btn"><i class="bi bi-chevron-left"></i></a>
+    {% endif %}
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+        <a href="{{ url_for('invoices.list_invoices', page=p, status=status_filter, q=search) }}"
+           class="pg-btn {{ 'active' if p == pagination.page else '' }}">{{ p }}</a>
+      {% else %}
+        <span class="pg-ellipsis">…</span>
+      {% endif %}
+    {% endfor %}
+    {% if pagination.has_next %}
+      <a href="{{ url_for('invoices.list_invoices', page=pagination.next_num, status=status_filter, q=search) }}"
+         class="pg-btn"><i class="bi bi-chevron-right"></i></a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+<!-- ── Empty state ─────────────────────────────────────────── -->
+<div class="dash-panel">
+  <div class="empty-state">
+    <div class="empty-icon">
+      <i class="bi bi-{{ 'search' if search else 'file-earmark-text' }}"></i>
+    </div>
+    {% if search or status_filter %}
+      <p class="empty-title">No invoices match this filter</p>
+      <p class="empty-sub">Try clearing the filter or search term.</p>
+      <a href="{{ url_for('invoices.list_invoices') }}"
+         class="btn-dash-action" style="opacity:1;text-decoration:none">
+        Clear filters
+      </a>
+    {% else %}
+      <p class="empty-title">No invoices yet</p>
+      <p class="empty-sub">Create your first invoice to start billing clients.</p>
+      <a href="{{ url_for('invoices.create_invoice') }}"
+         class="btn-dash-action" style="opacity:1;text-decoration:none">
+        <i class="bi bi-plus-lg"></i> New Invoice
+      </a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
